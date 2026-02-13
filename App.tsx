@@ -29,30 +29,49 @@ const App: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Auto-check for local files in the 'localModel' folder on mount
+  // Auto-check for any .onnx and .json files in the 'localModel' folder on mount
   useEffect(() => {
     const attemptAutoLoad = async () => {
       try {
-        // Updated paths to look inside 'localModel' directory
-        const [modelRes, configRes] = await Promise.all([
-          fetch('./localModel/model.onnx'),
-          fetch('./localModel/config.json')
-        ]);
+        // Step 1: Attempt to fetch the directory index of /localModel/
+        // This relies on the server providing a directory listing (common for local dev environments)
+        const dirRes = await fetch('./localModel/');
+        if (!dirRes.ok) throw new Error("Could not access /localModel/ directory listing");
 
-        if (modelRes.ok && configRes.ok) {
-          setLoadingMessage('Initializing local engine from assets...');
+        const html = await dirRes.text();
+        
+        // Step 2: Use regex to extract filenames from the directory listing HTML
+        // Matches typical <a href="filename.onnx"> patterns
+        const onnxMatch = html.match(/href=["']?([^"' >]+\.onnx)["']?/i);
+        const jsonMatch = html.match(/href=["']?([^"' >]+\.json)["']?/i);
+
+        if (onnxMatch && jsonMatch) {
+          const onnxFileName = onnxMatch[1];
+          const jsonFileName = jsonMatch[1];
+          
+          setLoadingMessage(`Initializing local engine: ${onnxFileName}...`);
           setIsLoading(true);
           
-          const modelBuffer = await modelRes.arrayBuffer();
-          const configJson = await configRes.json();
-          
-          await processModelData(modelBuffer, configJson);
-          setIsLocalModel(true);
+          // Step 3: Fetch the specific files identified by the scraper
+          const [modelRes, configRes] = await Promise.all([
+            fetch(`./localModel/${onnxFileName}`),
+            fetch(`./localModel/${jsonFileName}`)
+          ]);
+
+          if (modelRes.ok && configRes.ok) {
+            const modelBuffer = await modelRes.arrayBuffer();
+            const configJson = await configRes.json();
+            
+            await processModelData(modelBuffer, configJson);
+            setIsLocalModel(true);
+          } else {
+            throw new Error("Found files in directory listing but could not fetch their contents.");
+          }
         } else {
-          console.log("Local model files not found in /localModel/ folder.");
+          console.log("No valid .onnx and .json pairs found in /localModel/ listing.");
         }
       } catch (err) {
-        console.log("No local model detected or error during fetch, showing uploader.");
+        console.log("Auto-detection skipped (folder may be empty or indexing disabled).", err);
       } finally {
         setIsAutoChecking(false);
         setIsLoading(false);
@@ -183,7 +202,7 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen bg-dark flex flex-col items-center justify-center p-4">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-primary mb-4"></div>
-        <p className="text-slate-400 font-medium animate-pulse">Checking /localModel/ for assets...</p>
+        <p className="text-slate-400 font-medium animate-pulse">Scanning /localModel/ for assets...</p>
       </div>
     );
   }
