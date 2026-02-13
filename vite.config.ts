@@ -9,16 +9,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: './index.html',
-      },
-      external: [
-        'react',
-        'react-dom',
-        'react-dom/client',
-        'jspdf',
-        'mgrs',
-        '@heroicons/react/24/outline',
-        '@heroicons/react/24/solid'
-      ],
+      }
     },
   },
   server: {
