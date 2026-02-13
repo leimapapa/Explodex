@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   MapPinIcon, 
@@ -70,19 +69,21 @@ export const ReportWizard: React.FC<ReportWizardProps> = ({ data, confidence, so
       doc.rect(0, 0, 210, 50, 'F');
       
       // Process Logo for PDF (White version for dark background)
+      // Replace currentColor with hardcoded white for the canvas rendering
       const whiteLogoSvg = APP_LOGO_SVG.replace(/currentColor/g, '#FFFFFF');
-      // Original Aspect Ratio is ~80:181 (0.44). We set height to 30mm, width will be ~13mm.
-      const logoPng = await svgToPng(whiteLogoSvg, 80, 181);
-      doc.addImage(logoPng, 'PNG', margin, 10, 12, 27);
+      
+      // Original Aspect Ratio is 80:181 (0.442). We'll set height to 30mm, width will be ~13.25mm.
+      const logoPng = await svgToPng(whiteLogoSvg, 160, 362); // Render at 2x for sharpness
+      doc.addImage(logoPng, 'PNG', margin, 10, 13.25, 30);
 
       doc.setTextColor(99, 102, 241); // Primary Indigo
       doc.setFontSize(24);
       doc.setFont('helvetica', 'bold');
-      doc.text("EXPLODEX", margin + 18, 25);
+      doc.text("EXPLODEX", margin + 20, 25);
       
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(14);
-      doc.text("ORDNANCE FIELD REPORT", margin + 18, 35);
+      doc.text("ORDNANCE FIELD REPORT", margin + 20, 35);
       
       doc.setFontSize(8);
       doc.setFont('helvetica', 'normal');

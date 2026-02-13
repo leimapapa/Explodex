@@ -9,44 +9,47 @@ export const IMAGENET_STD = [0.229, 0.224, 0.225];
 export const TARGET_WIDTH = 224;
 export const TARGET_HEIGHT = 224;
 
-// Custom App Logo SVG
-export const APP_LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 181" fill="none">
+// Custom App Logo SVG (User Provided)
+export const APP_LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="80" height="181" viewBox="0 0 80 181" fill="none">
+<g filter="url(#filter0_d_452_137)">
+<path d="M55.6158 64.9464L69.231 72.6752V134.935L39.2309 164.133L10 134.935V71.3871L69.231 40.9012V12.1328L39.2309 34.4605L10 12.1328V40.9012L22.1541 49.4887" stroke="currentColor" stroke-width="12" stroke-linecap="round"/>
+<path d="M30.8035 76.1103L30.707 87.3069L9.63066 98.0152L5.86596 88.7805L30.8035 76.1103Z" fill="currentColor" stroke="currentColor"/>
+<path d="M31.7225 97.1008L31.5511 108.335L10.554 119.004L6.7893 109.769L31.7225 97.1008Z" fill="currentColor" stroke="currentColor"/>
+</g>
 <defs>
-<filter id="filter0_d_452_156" x="0" y="0" width="79.231" height="180.559" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<filter id="filter0_d_452_137" x="0" y="0" width="79.231" height="180.559" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
 <feFlood flood-opacity="0" result="BackgroundImageFix"/>
 <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
 <feOffset dy="4"/>
 <feGaussianBlur stdDeviation="2"/>
 <feComposite in2="hardAlpha" operator="out"/>
 <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"/>
-<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_452_156"/>
-<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_452_156" result="shape"/>
+<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_452_137"/>
+<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_452_137" result="shape"/>
 </filter>
 </defs>
-<g filter="url(#filter0_d_452_156)">
-<path d="M55.6158 64.9464L69.231 72.6752V134.935L39.2309 164.133L10 134.935V71.3871L69.231 40.9012V12.1328L39.2309 34.4605L10 12.1328V40.9012L22.1541 49.4887" stroke="white" stroke-width="12" stroke-linecap="round"/>
-<path d="M30.8035 76.1103L30.707 87.3069L9.63066 98.0152L5.86596 88.7805L30.8035 76.1103Z" fill="white" stroke="white"/>
-<path d="M31.7225 97.1008L31.5511 108.335L10.554 119.004L6.7893 109.769L31.7225 97.1008Z" fill="white" stroke="white"/>
-</g>
 </svg>`;
+
 export const APP_LOGO_SVG_SQUARE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 181 181" fill="none">
+<g transform="translate(50 0)">
+<g filter="url(#filter0_d_452_137)">
+<path d="M55.6158 64.9464L69.231 72.6752V134.935L39.2309 164.133L10 134.935V71.3871L69.231 40.9012V12.1328L39.2309 34.4605L10 12.1328V40.9012L22.1541 49.4887" stroke="currentColor" stroke-width="12" stroke-linecap="round"/>
+<path d="M30.8035 76.1103L30.707 87.3069L9.63066 98.0152L5.86596 88.7805L30.8035 76.1103Z" fill="currentColor" stroke="currentColor"/>
+<path d="M31.7225 97.1008L31.5511 108.335L10.554 119.004L6.7893 109.769L31.7225 97.1008Z" fill="currentColor" stroke="currentColor"/>
+</g>
+</g>
 <defs>
-<filter id="filter0_d_452_156" x="0" y="0" width="79.231" height="180.559" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<filter id="filter0_d_452_137" x="0" y="0" width="79.231" height="180.559" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
 <feFlood flood-opacity="0" result="BackgroundImageFix"/>
 <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
 <feOffset dy="4"/>
 <feGaussianBlur stdDeviation="2"/>
 <feComposite in2="hardAlpha" operator="out"/>
 <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"/>
-<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_452_156"/>
-<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_452_156" result="shape"/>
+<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_452_137"/>
+<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_452_137" result="shape"/>
 </filter>
 </defs>
-<g filter="url(#filter0_d_452_156)" transform="translate(50 0)">
-<path d="M55.6158 64.9464L69.231 72.6752V134.935L39.2309 164.133L10 134.935V71.3871L69.231 40.9012V12.1328L39.2309 34.4605L10 12.1328V40.9012L22.1541 49.4887" stroke="white" stroke-width="12" stroke-linecap="round"/>
-<path d="M30.8035 76.1103L30.707 87.3069L9.63066 98.0152L5.86596 88.7805L30.8035 76.1103Z" fill="white" stroke="white"/>
-<path d="M31.7225 97.1008L31.5511 108.335L10.554 119.004L6.7893 109.769L31.7225 97.1008Z" fill="white" stroke="white"/>
-</g>
 </svg>`;
 
 // Built-in descriptions for specific classes (UXO Context)

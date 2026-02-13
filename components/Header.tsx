@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { APP_LOGO_SVG_SQUARE } from '../constants';
 
