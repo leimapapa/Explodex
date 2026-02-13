@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { ClassInfo, InferenceResult, ModelManifest, PreprocessConfig } from './types';
 import { loadSession, runInference } from './services/onnxService';
@@ -29,22 +28,23 @@ const App: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Auto-check for any .onnx and .json files in the 'localModel' folder on mount
+  /**
+   * Auto-detection Logic:
+   * Scans /localModel/ for any file ending in .onnx and any file ending in .json.
+   * If found, loads them automatically.
+   */
   useEffect(() => {
     const attemptAutoLoad = async () => {
       try {
-        // Attempt to fetch the directory index. 
-        // Note: On static hosts like GitHub Pages, this will usually 404.
         const dirRes = await fetch('./localModel/');
-        
         if (!dirRes.ok) {
-          console.log("No directory listing available for /localModel/ (expected on static hosts).");
-          return; // Fall back to manual uploader
+          console.log("No directory listing available for /localModel/.");
+          return;
         }
 
         const html = await dirRes.text();
         
-        // Regex to find any .onnx and .json files in the directory listing
+        // Find any .onnx file and any .json file in the directory listing
         const onnxMatch = html.match(/href=["']?([^"' >]+\.onnx)["']?/i);
         const jsonMatch = html.match(/href=["']?([^"' >]+\.json)["']?/i);
 
@@ -52,7 +52,7 @@ const App: React.FC = () => {
           const onnxFileName = onnxMatch[1];
           const jsonFileName = jsonMatch[1];
           
-          setLoadingMessage(`Initializing local model: ${onnxFileName}...`);
+          setLoadingMessage(`Initializing ${onnxFileName}...`);
           setIsLoading(true);
           
           const [modelRes, configRes] = await Promise.all([
@@ -67,13 +67,12 @@ const App: React.FC = () => {
             await processModelData(modelBuffer, configJson);
             setIsLocalModel(true);
           } else {
-            console.error("Identified local assets but failed to fetch them.");
+            console.warn(`Failed to fetch identified files: ${onnxFileName}, ${jsonFileName}`);
           }
         }
       } catch (err) {
-        console.log("Auto-detection skipped (localModel folder not found or listing disabled).");
+        console.log("Auto-detection skipped (likely running on a host with indexing disabled).", err);
       } finally {
-        // Always stop the auto-check spinner to allow the app to render the uploader
         setIsAutoChecking(false);
         setIsLoading(false);
       }
@@ -82,7 +81,6 @@ const App: React.FC = () => {
     attemptAutoLoad();
   }, []);
 
-  // Run inference automatically when an image is selected
   useEffect(() => {
     if (image && session) {
       setResult(null);
@@ -101,7 +99,7 @@ const App: React.FC = () => {
       };
       let metadata = {};
 
-      if (Array.isArray(jsonContent.classes)) {
+      if (jsonContent && Array.isArray(jsonContent.classes)) {
          const manifest = jsonContent as ModelManifest;
          config = {
            width: manifest.img_size || TARGET_WIDTH,
@@ -122,7 +120,7 @@ const App: React.FC = () => {
              details: { "Model Class Name": className }
            };
          });
-      } else {
+      } else if (jsonContent) {
         mapping = jsonContent;
       }
 
@@ -134,7 +132,7 @@ const App: React.FC = () => {
       setSession(sess);
     } catch (err) {
       console.error(err);
-      throw new Error("Failed to process model configuration. Please check your JSON format.");
+      throw new Error("Failed to process model configuration. Please check your config JSON.");
     }
   };
 
@@ -167,7 +165,6 @@ const App: React.FC = () => {
     setIsLoading(true);
     setLoadingMessage('Running Inference...');
     
-    // Tiny timeout to let UI update before heavy inference
     setTimeout(async () => {
       try {
         const imgElement = document.createElement('img');
@@ -183,8 +180,12 @@ const App: React.FC = () => {
             setIsLoading(false);
           }
         };
+        imgElement.onerror = () => {
+          setError("Failed to load image for processing.");
+          setIsLoading(false);
+        };
       } catch (e: any) {
-        setError("Error processing image for inference.");
+        setError("Inference engine error.");
         setIsLoading(false);
       }
     }, 100);
@@ -203,8 +204,8 @@ const App: React.FC = () => {
   if (isAutoChecking) {
     return (
       <div className="min-h-screen bg-dark flex flex-col items-center justify-center p-4">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-primary mb-4"></div>
-        <p className="text-slate-400 font-medium animate-pulse">Scanning /localModel/ for assets...</p>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-primary mb-4 shadow-[0_0_15px_rgba(99,102,241,0.5)]"></div>
+        <p className="text-slate-400 font-medium animate-pulse">Scanning local assets...</p>
       </div>
     );
   }
@@ -213,10 +214,10 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-dark text-slate-200 font-sans selection:bg-primary selection:text-white pb-12">
       <Header />
 
-      <main className="container mx-auto px-4 max-w-4xl mt-8">
+      <main className="container mx-auto px-4 max-w-4xl mt-8 animate-in fade-in duration-700">
         
         {error && (
-          <div className="bg-red-500/10 border border-red-500/50 text-red-200 p-4 rounded-xl mb-6 flex items-center justify-between animate-in slide-in-from-top-2">
+          <div className="bg-red-500/10 border border-red-500/50 text-red-200 p-4 rounded-xl mb-6 flex items-center justify-between shadow-lg">
             <span>{error}</span>
             <button onClick={() => setError(null)} className="text-sm underline hover:text-white ml-4">Dismiss</button>
           </div>
@@ -224,7 +225,7 @@ const App: React.FC = () => {
 
         {isLoading && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center p-4">
-            <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-primary mb-4"></div>
+            <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-primary mb-4 shadow-[0_0_30px_rgba(99,102,241,0.3)]"></div>
             <p className="text-xl font-medium text-white animate-pulse">{loadingMessage}</p>
           </div>
         )}
@@ -236,12 +237,12 @@ const App: React.FC = () => {
             <div className="flex justify-between items-center mb-4">
                <div className="flex flex-col md:flex-row md:items-center gap-3">
                  <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary">
-                   {modelMetadata?.name || 'Inference Engine Ready'}
+                   {modelMetadata?.name || 'Inference Engine Active'}
                  </h2>
                  {isLocalModel && (
                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 border border-primary/20 text-primary-400 rounded-full text-[10px] font-bold uppercase tracking-wider">
                      <CheckBadgeIcon className="w-3.5 h-3.5" />
-                     Auto-Loaded
+                     Asset Auto-Linked
                    </div>
                  )}
                  {modelMetadata?.accuracy && (
@@ -256,7 +257,7 @@ const App: React.FC = () => {
                  className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors"
                >
                  <ArrowPathIcon className="w-4 h-4" />
-                 Reset Engine
+                 Unload System
                </button>
             </div>
             
