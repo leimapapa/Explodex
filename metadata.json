@@ -1,0 +1,8 @@
+{
+  "name": "Explodex",
+  "description": "A completely offline, privacy-first image classification tool running ONNX models directly in your browser. Load your own model and data to explore AI locally.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ]
+}
