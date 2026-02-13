@@ -30,7 +30,6 @@ export const ReportWizard: React.FC<ReportWizardProps> = ({ data, confidence, so
   const [location, setLocation] = useState<{ lat: number; lon: number } | null>(null);
   const [locError, setLocError] = useState<string | null>(null);
 
-  // Fetch location if toggled
   useEffect(() => {
     if (includeLocation && !location) {
       navigator.geolocation.getCurrentPosition(
@@ -50,6 +49,7 @@ export const ReportWizard: React.FC<ReportWizardProps> = ({ data, confidence, so
   const getMGRSDisplay = () => {
     if (!location) return "Searching...";
     try {
+      // Use the namespace import for mgrs
       return mgrs.forward([location.lon, location.lat]);
     } catch (e) {
       console.error("MGRS conversion error:", e);
@@ -65,25 +65,24 @@ export const ReportWizard: React.FC<ReportWizardProps> = ({ data, confidence, so
       let y = margin;
 
       // Header Banner
-      doc.setFillColor(15, 23, 42); // Slate-900
+      doc.setFillColor(15, 23, 42); 
       doc.rect(0, 0, 210, 50, 'F');
       
       // Process Logo for PDF (White version for dark background)
-      // Replace currentColor with hardcoded white for the canvas rendering
       const whiteLogoSvg = APP_LOGO_SVG.replace(/currentColor/g, '#FFFFFF');
       
-      // Original Aspect Ratio is 80:181 (0.442). We'll set height to 30mm, width will be ~13.25mm.
-      const logoPng = await svgToPng(whiteLogoSvg, 160, 362); // Render at 2x for sharpness
-      doc.addImage(logoPng, 'PNG', margin, 10, 13.25, 30);
+      // High-res rendering of SVG to PNG for PDF compatibility
+      const logoPng = await svgToPng(whiteLogoSvg, 240, 543); 
+      doc.addImage(logoPng, 'PNG', margin, 10, 13, 30);
 
-      doc.setTextColor(99, 102, 241); // Primary Indigo
+      doc.setTextColor(99, 102, 241); 
       doc.setFontSize(24);
       doc.setFont('helvetica', 'bold');
-      doc.text("EXPLODEX", margin + 20, 25);
+      doc.text("EXPLODEX", margin + 18, 25);
       
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(14);
-      doc.text("ORDNANCE FIELD REPORT", margin + 20, 35);
+      doc.text("ORDNANCE FIELD REPORT", margin + 18, 35);
       
       doc.setFontSize(8);
       doc.setFont('helvetica', 'normal');
@@ -185,14 +184,15 @@ export const ReportWizard: React.FC<ReportWizardProps> = ({ data, confidence, so
   };
 
   return (
-    <div className="flex flex-col h-full bg-dark">
-      <div className="p-6 border-b border-white/5 bg-slate-900/40 flex items-center justify-between shrink-0">
+    <div className="flex flex-col flex-1 min-h-0 bg-dark">
+      {/* Header - Fixed height */}
+      <div className="p-5 md:p-6 border-b border-white/5 bg-slate-900/40 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <button onClick={onCancel} className="p-1 hover:bg-white/10 rounded-full transition-colors text-slate-400">
             <ChevronLeftIcon className="w-6 h-6" />
           </button>
           <div>
-            <h2 className="text-xl font-bold text-white leading-tight">Field Reporter</h2>
+            <h2 className="text-lg md:text-xl font-bold text-white leading-tight">Field Reporter</h2>
             <p className="text-[10px] text-primary font-mono uppercase tracking-widest">Mil-Coordination Sync</p>
           </div>
         </div>
@@ -202,14 +202,14 @@ export const ReportWizard: React.FC<ReportWizardProps> = ({ data, confidence, so
         </div>
       </div>
 
-      <div className="flex-grow overflow-y-auto p-8 space-y-8">
-        {/* Localization Logic */}
+      {/* Main Content - Scrollable */}
+      <div className="flex-1 min-h-0 overflow-y-auto p-6 md:p-8 space-y-8">
         <section className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Geospatial Configuration</h3>
             {locError && <span className="text-[10px] text-red-400 font-medium animate-pulse">{locError}</span>}
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <button 
               onClick={() => setIncludeLocation(!includeLocation)}
               className={`p-4 rounded-xl border text-left transition-all ${includeLocation ? 'bg-primary/5 border-primary/40 ring-1 ring-primary/20' : 'bg-slate-800/30 border-white/5 hover:border-white/10'}`}
@@ -246,7 +246,6 @@ export const ReportWizard: React.FC<ReportWizardProps> = ({ data, confidence, so
           )}
         </section>
 
-        {/* Narrative Section */}
         <section className="space-y-6">
           <div className="space-y-2">
             <label className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
@@ -275,7 +274,8 @@ export const ReportWizard: React.FC<ReportWizardProps> = ({ data, confidence, so
         </section>
       </div>
 
-      <div className="p-6 border-t border-white/5 bg-slate-900/80 shrink-0">
+      {/* Footer - Fixed height */}
+      <div className="p-5 md:p-6 border-t border-white/5 bg-slate-900/80 shrink-0">
         <button
           onClick={generatePDF}
           disabled={isGenerating}

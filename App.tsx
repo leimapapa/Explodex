@@ -29,52 +29,52 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   /**
-   * Auto-detection Logic:
-   * Scans /localModel/ for any file ending in .onnx and any file ending in .json.
-   * If found, loads them automatically.
+   * Ultra-fast Auto-detection:
+   * Pings localModel/manifest.json. If it doesn't respond in 500ms, fallback to manual.
    */
   useEffect(() => {
     const attemptAutoLoad = async () => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 500); // Tight 500ms probe
+
       try {
-        const dirRes = await fetch('./localModel/');
-        if (!dirRes.ok) {
-          console.log("No directory listing available for /localModel/.");
-          return;
-        }
-
-        const html = await dirRes.text();
+        // Try to fetch manifest.json header first to see if it exists
+        const response = await fetch('./localModel/manifest.json', { 
+          method: 'GET',
+          signal: controller.signal 
+        });
         
-        // Find any .onnx file and any .json file in the directory listing
-        const onnxMatch = html.match(/href=["']?([^"' >]+\.onnx)["']?/i);
-        const jsonMatch = html.match(/href=["']?([^"' >]+\.json)["']?/i);
-
-        if (onnxMatch && jsonMatch) {
-          const onnxFileName = onnxMatch[1];
-          const jsonFileName = jsonMatch[1];
-          
-          setLoadingMessage(`Initializing ${onnxFileName}...`);
-          setIsLoading(true);
-          
-          const [modelRes, configRes] = await Promise.all([
-            fetch(`./localModel/${onnxFileName}`),
-            fetch(`./localModel/${jsonFileName}`)
-          ]);
-
-          if (modelRes.ok && configRes.ok) {
-            const modelBuffer = await modelRes.arrayBuffer();
-            const configJson = await configRes.json();
-            
-            await processModelData(modelBuffer, configJson);
-            setIsLocalModel(true);
-          } else {
-            console.warn(`Failed to fetch identified files: ${onnxFileName}, ${jsonFileName}`);
-          }
+        if (response.ok) {
+          const configJson = await response.json();
+          // Manifest exists, start full model load
+          await loadFromPaths('model.onnx', configJson);
+        } else {
+          setIsAutoChecking(false);
         }
       } catch (err) {
-        console.log("Auto-detection skipped (likely running on a host with indexing disabled).", err);
-      } finally {
+        // Most likely 404 or Timeout
+        console.log("Auto-detection: Local assets not found. Switching to manual mode.");
         setIsAutoChecking(false);
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    };
+
+    const loadFromPaths = async (onnxPath: string, configJson: any) => {
+      setLoadingMessage(`Booting Embedded System...`);
+      setIsLoading(true);
+      try {
+        const modelRes = await fetch(`./localModel/${onnxPath}`);
+        if (modelRes.ok) {
+          const modelBuffer = await modelRes.arrayBuffer();
+          await processModelData(modelBuffer, configJson);
+          setIsLocalModel(true);
+        }
+      } catch (e) {
+        console.error("Local model binary failed to load:", e);
+      } finally {
         setIsLoading(false);
+        setIsAutoChecking(false);
       }
     };
 
@@ -115,9 +115,9 @@ const App: React.FC = () => {
            const builtIn = BUILT_IN_CLASS_DESCRIPTIONS[className];
            mapping[idx.toString()] = builtIn || {
              title: className,
-             description: "No detailed description available for this class.",
+             description: "External dataset class detected.",
              tags: ["Custom"],
-             details: { "Model Class Name": className }
+             details: { "Label": className }
            };
          });
       } else if (jsonContent) {
@@ -132,14 +132,14 @@ const App: React.FC = () => {
       setSession(sess);
     } catch (err) {
       console.error(err);
-      throw new Error("Failed to process model configuration. Please check your config JSON.");
+      throw new Error("Invalid Model Configuration: Check JSON and ONNX compatibility.");
     }
   };
 
   const handleModelLoad = async (modelFile: File, jsonFile: File) => {
     setIsLoading(true);
     setError(null);
-    setLoadingMessage('Loading ONNX Model...');
+    setLoadingMessage('Optimizing Neural Hub...');
     try {
       const reader = new FileReader();
       reader.onload = async (e) => {
@@ -148,13 +148,13 @@ const App: React.FC = () => {
           await processModelData(modelFile, jsonContent);
           setIsLoading(false);
         } catch (err) {
-          setError("Failed to parse JSON configuration file.");
+          setError("Manifest Error: JSON format is invalid.");
           setIsLoading(false);
         }
       };
       reader.readAsText(jsonFile);
     } catch (err) {
-      setError("Failed to load model. Ensure it is a valid .onnx file.");
+      setError("ONNX Error: System could not initialize model binary.");
       setIsLoading(false);
     }
   };
@@ -163,8 +163,9 @@ const App: React.FC = () => {
     if (!session || !image) return;
 
     setIsLoading(true);
-    setLoadingMessage('Running Inference...');
+    setLoadingMessage('Processing Signal...');
     
+    // Defer for UI responsiveness
     setTimeout(async () => {
       try {
         const imgElement = document.createElement('img');
@@ -175,20 +176,20 @@ const App: React.FC = () => {
             setResult(inferenceResult);
             setIsModalOpen(true);
           } catch (e: any) {
-            setError(`Inference failed: ${e.message}`);
+            setError(`Inference Fault: ${e.message}`);
           } finally {
             setIsLoading(false);
           }
         };
         imgElement.onerror = () => {
-          setError("Failed to load image for processing.");
+          setError("Signal Error: Image buffer corrupted.");
           setIsLoading(false);
         };
       } catch (e: any) {
-        setError("Inference engine error.");
+        setError("Core System Failure.");
         setIsLoading(false);
       }
-    }, 100);
+    }, 50);
   };
 
   const resetSession = () => {
@@ -204,8 +205,11 @@ const App: React.FC = () => {
   if (isAutoChecking) {
     return (
       <div className="min-h-screen bg-dark flex flex-col items-center justify-center p-4">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-primary mb-4 shadow-[0_0_15px_rgba(99,102,241,0.5)]"></div>
-        <p className="text-slate-400 font-medium animate-pulse">Scanning local assets...</p>
+        <div className="relative h-12 w-12 mb-6">
+           <div className="absolute inset-0 animate-ping rounded-full bg-primary/20"></div>
+           <div className="relative animate-spin rounded-full h-12 w-12 border-t-2 border-primary shadow-[0_0_15px_rgba(99,102,241,0.5)]"></div>
+        </div>
+        <p className="text-slate-500 font-mono text-[10px] uppercase tracking-[0.3em] animate-pulse">Syncing Local Assets</p>
       </div>
     );
   }
@@ -218,15 +222,15 @@ const App: React.FC = () => {
         
         {error && (
           <div className="bg-red-500/10 border border-red-500/50 text-red-200 p-4 rounded-xl mb-6 flex items-center justify-between shadow-lg">
-            <span>{error}</span>
-            <button onClick={() => setError(null)} className="text-sm underline hover:text-white ml-4">Dismiss</button>
+            <span className="text-sm font-medium">{error}</span>
+            <button onClick={() => setError(null)} className="text-[10px] font-bold uppercase tracking-widest bg-red-500/20 px-3 py-1 rounded-md hover:bg-red-500/30 ml-4 transition-colors">Clear</button>
           </div>
         )}
 
         {isLoading && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center p-4">
             <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-primary mb-4 shadow-[0_0_30px_rgba(99,102,241,0.3)]"></div>
-            <p className="text-xl font-medium text-white animate-pulse">{loadingMessage}</p>
+            <p className="text-sm font-bold text-white uppercase tracking-[0.2em] animate-pulse">{loadingMessage}</p>
           </div>
         )}
 
@@ -236,28 +240,28 @@ const App: React.FC = () => {
           <div className="space-y-6">
             <div className="flex justify-between items-center mb-4">
                <div className="flex flex-col md:flex-row md:items-center gap-3">
-                 <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary">
-                   {modelMetadata?.name || 'Inference Engine Active'}
+                 <h2 className="text-2xl font-bold text-white">
+                   {modelMetadata?.name || 'Active Instance'}
                  </h2>
                  {isLocalModel && (
                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 border border-primary/20 text-primary-400 rounded-full text-[10px] font-bold uppercase tracking-wider">
                      <CheckBadgeIcon className="w-3.5 h-3.5" />
-                     Asset Auto-Linked
+                     Auto-Linked
                    </div>
                  )}
                  {modelMetadata?.accuracy && (
-                   <span className="text-xs text-green-400 bg-green-500/10 border border-green-500/20 px-2 py-0.5 rounded-full font-mono">
-                     Acc: {modelMetadata.accuracy.toFixed(2)}%
+                   <span className="text-[10px] text-green-400 bg-green-500/10 border border-green-500/20 px-2.5 py-1 rounded-full font-mono font-bold">
+                     ACC: {modelMetadata.accuracy.toFixed(1)}%
                    </span>
                  )}
                </div>
                
                <button 
                  onClick={resetSession}
-                 className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors"
+                 className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-500 hover:text-white transition-colors"
                >
-                 <ArrowPathIcon className="w-4 h-4" />
-                 Unload System
+                 <ArrowPathIcon className="w-3.5 h-3.5" />
+                 Unload
                </button>
             </div>
             
