@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { 
-  XMarkIcon, 
   MapPinIcon, 
-  ClockIcon, 
   ShieldCheckIcon, 
   ArrowRightCircleIcon,
   ChevronLeftIcon,
@@ -12,7 +11,9 @@ import {
 } from '@heroicons/react/24/outline';
 import { ClassInfo } from '../types';
 import { jsPDF } from 'jspdf';
-import mgrs from 'mgrs';
+import * as mgrs from 'mgrs';
+import { APP_LOGO_SVG } from '../constants';
+import { svgToPng } from '../utils/imageUtils';
 
 interface ReportWizardProps {
   data: ClassInfo;
@@ -24,25 +25,31 @@ interface ReportWizardProps {
 export const ReportWizard: React.FC<ReportWizardProps> = ({ data, confidence, sourceImage, onCancel }) => {
   const [includeLocation, setIncludeLocation] = useState(true);
   const [useMGRS, setUseMGRS] = useState(true);
-  const [includeDetails, setIncludeDetails] = useState(true);
   const [renderSafe, setRenderSafe] = useState('');
   const [furtherActions, setFurtherActions] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [location, setLocation] = useState<{ lat: number; lon: number } | null>(null);
+  const [locError, setLocError] = useState<string | null>(null);
 
   // Fetch location if toggled
-  React.useEffect(() => {
+  useEffect(() => {
     if (includeLocation && !location) {
       navigator.geolocation.getCurrentPosition(
-        (pos) => setLocation({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
-        (err) => console.error("Location error:", err),
-        { enableHighAccuracy: true }
+        (pos) => {
+          setLocation({ lat: pos.coords.latitude, lon: pos.coords.longitude });
+          setLocError(null);
+        },
+        (err) => {
+          console.error("Location error:", err);
+          setLocError("Location access denied or unavailable.");
+        },
+        { enableHighAccuracy: true, timeout: 5000 }
       );
     }
-  }, [includeLocation]);
+  }, [includeLocation, location]);
 
-  const getMGRS = () => {
-    if (!location) return null;
+  const getMGRSDisplay = () => {
+    if (!location) return "Searching...";
     try {
       return mgrs.forward([location.lon, location.lat]);
     } catch (e) {
@@ -58,192 +65,213 @@ export const ReportWizard: React.FC<ReportWizardProps> = ({ data, confidence, so
       const margin = 20;
       let y = margin;
 
-      // Header
-      doc.setFillColor(30, 41, 59); // Slate-800
-      doc.rect(0, 0, 210, 40, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(22);
-      doc.setFont('helvetica', 'bold');
-      doc.text("EXPLODEX ORDNANCE REPORT", margin, 25);
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.text("Military Standard Automated Reporting", margin, 32);
+      // Header Banner
+      doc.setFillColor(15, 23, 42); // Slate-900
+      doc.rect(0, 0, 210, 50, 'F');
+      
+      // Process Logo for PDF (White version for dark background)
+      const whiteLogoSvg = APP_LOGO_SVG.replace(/currentColor/g, '#FFFFFF');
+      // Original Aspect Ratio is ~80:181 (0.44). We set height to 30mm, width will be ~13mm.
+      const logoPng = await svgToPng(whiteLogoSvg, 80, 181);
+      doc.addImage(logoPng, 'PNG', margin, 10, 12, 27);
 
-      y = 55;
+      doc.setTextColor(99, 102, 241); // Primary Indigo
+      doc.setFontSize(24);
+      doc.setFont('helvetica', 'bold');
+      doc.text("EXPLODEX", margin + 18, 25);
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(14);
+      doc.text("ORDNANCE FIELD REPORT", margin + 18, 35);
+      
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`REPORT ID: EXP-${Math.random().toString(36).substr(2, 9).toUpperCase()}`, 190, 15, { align: 'right' });
+
+      y = 65;
       doc.setTextColor(30, 41, 59);
       
-      // Finding Section
+      // 1. Classification Data
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
-      doc.text("1. CLASSIFICATION FINDINGS", margin, y);
-      y += 8;
+      doc.text("1. TARGET CLASSIFICATION", margin, y);
+      doc.setDrawColor(226, 232, 240);
+      doc.line(margin, y + 2, 190, y + 2);
+      
+      y += 12;
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(11);
-      doc.text(`Ordnance Type: ${data.title}`, margin, y);
-      y += 6;
-      doc.text(`Confidence Level: ${(confidence * 100).toFixed(2)}%`, margin, y);
-      y += 6;
-      doc.text(`Timestamp: ${new Date().toLocaleString()}`, margin, y);
+      doc.text(`Ordnance Type:`, margin, y);
+      doc.setFont('helvetica', 'bold');
+      doc.text(data.title, margin + 40, y);
+      
+      y += 8;
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Confidence:`, margin, y);
+      if (confidence > 0.8) {
+        doc.setTextColor(22, 163, 74);
+      } else {
+        doc.setTextColor(30, 41, 59);
+      }
+      doc.text(`${(confidence * 100).toFixed(2)}%`, margin + 40, y);
+      doc.setTextColor(30, 41, 59);
+      
+      y += 8;
+      doc.text(`Timestamp:`, margin, y);
+      doc.text(new Date().toLocaleString(), margin + 40, y);
       
       if (includeLocation && location) {
-        y += 6;
-        if (useMGRS) {
-           doc.text(`Grid Reference (MGRS): ${getMGRS()}`, margin, y);
-        } else {
-           doc.text(`Position (Lat/Lon): ${location.lat.toFixed(6)}, ${location.lon.toFixed(6)}`, margin, y);
-        }
+        y += 8;
+        doc.text(`Location:`, margin, y);
+        const locString = useMGRS 
+          ? `MGRS: ${getMGRSDisplay()}` 
+          : `WGS84: ${location.lat.toFixed(6)}, ${location.lon.toFixed(6)}`;
+        doc.text(locString, margin + 40, y);
       }
 
-      // Image Section
-      y += 15;
+      // 2. Visual Evidence
+      y += 20;
       doc.setFont('helvetica', 'bold');
       doc.text("2. VISUAL EVIDENCE", margin, y);
-      y += 5;
+      doc.line(margin, y + 2, 190, y + 2);
+      y += 10;
+      
       try {
-        doc.addImage(sourceImage, 'JPEG', margin, y, 80, 60);
-        y += 70;
+        doc.addImage(sourceImage, 'JPEG', margin, y, 90, 67.5);
+        y += 80;
       } catch (e) {
-        doc.text("[Image could not be rendered in PDF]", margin, y + 10);
+        doc.setFont('helvetica', 'italic');
+        doc.text("[Visual Attachment Fault]", margin, y + 10);
         y += 20;
       }
 
-      // Operational Notes
+      // 3. Narrative & Actions
+      if (y > 220) { doc.addPage(); y = 20; }
+      
       doc.setFont('helvetica', 'bold');
-      doc.text("3. OPERATIONAL NOTES", margin, y);
-      y += 8;
+      doc.text("3. DISPOSAL & OPERATIONAL NOTES", margin, y);
+      doc.line(margin, y + 2, 190, y + 2);
+      y += 12;
       
       doc.setFontSize(10);
-      doc.text("Render-Safe Procedure Status:", margin, y);
+      doc.text("Render-Safe Procedure / Neutralization:", margin, y);
       y += 6;
       doc.setFont('helvetica', 'normal');
-      const rsLines = doc.splitTextToSize(renderSafe || "No operational procedures documented.", 170);
+      const rsLines = doc.splitTextToSize(renderSafe || "Standard protocols pending field assessment.", 170);
       doc.text(rsLines, margin, y);
-      y += (rsLines.length * 5) + 5;
+      y += (rsLines.length * 5) + 10;
 
       doc.setFont('helvetica', 'bold');
-      doc.text("Follow-up Requirements:", margin, y);
+      doc.text("Follow-up Requirements / Disposal:", margin, y);
       y += 6;
       doc.setFont('helvetica', 'normal');
-      const faLines = doc.splitTextToSize(furtherActions || "None documented.", 170);
+      const faLines = doc.splitTextToSize(furtherActions || "Cordon established. Awaiting EOD disposal team.", 170);
       doc.text(faLines, margin, y);
-      y += (faLines.length * 5) + 15;
-
+      
       // Footer
       doc.setFontSize(8);
-      doc.setTextColor(150, 150, 150);
-      doc.text("Generated by Explodex AI. This document is a field report based on machine vision classification.", 105, 285, { align: 'center' });
+      doc.setTextColor(148, 163, 184);
+      doc.text("OFFLINE GENERATED FIELD REPORT - CLASSIFICATION SENSITIVE", 105, 285, { align: 'center' });
 
-      // Save
-      const filename = `Report_${data.title.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.pdf`;
+      const filename = `EXPLODEX_REPORT_${data.title.toUpperCase()}_${new Date().getTime()}.pdf`;
       doc.save(filename);
     } catch (err) {
       console.error("PDF Generation failed:", err);
-      alert("Failed to generate PDF. Check permissions.");
+      alert("Error generating PDF document.");
     } finally {
       setIsGenerating(false);
     }
   };
 
   return (
-    <div className="flex flex-col h-full animate-in slide-in-from-right-8 duration-300">
+    <div className="flex flex-col h-full bg-dark">
       <div className="p-6 border-b border-white/5 bg-slate-900/40 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <button onClick={onCancel} className="p-1 hover:bg-white/10 rounded-full transition-colors text-slate-400">
             <ChevronLeftIcon className="w-6 h-6" />
           </button>
           <div>
-            <h2 className="text-xl font-bold text-white leading-tight">Reporting System</h2>
-            <p className="text-xs text-slate-500 font-mono">MIL-STD Coordination</p>
+            <h2 className="text-xl font-bold text-white leading-tight">Field Reporter</h2>
+            <p className="text-[10px] text-primary font-mono uppercase tracking-widest">Mil-Coordination Sync</p>
           </div>
         </div>
         <div className="flex items-center gap-2 px-3 py-1 bg-primary/10 border border-primary/20 rounded-full">
           <DocumentTextIcon className="w-4 h-4 text-primary" />
-          <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Active Report</span>
+          <span className="text-[10px] font-bold text-primary uppercase tracking-wider">Report Draft</span>
         </div>
       </div>
 
-      <div className="flex-grow overflow-y-auto p-8 space-y-6">
-        
-        {/* Toggles */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div 
-            onClick={() => setIncludeLocation(!includeLocation)}
-            className={`p-4 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${includeLocation ? 'bg-primary/5 border-primary/40' : 'bg-slate-800/50 border-white/5 hover:border-white/10'}`}
-          >
-            <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-lg ${includeLocation ? 'bg-primary/20 text-primary' : 'bg-slate-700 text-slate-400'}`}>
-                <MapPinIcon className="w-5 h-5" />
-              </div>
-              <div className="text-left">
-                <span className="block text-sm font-bold text-white">Capture Location</span>
-                <span className="text-[10px] text-slate-500 uppercase">GPS Services</span>
-              </div>
-            </div>
-            <div className={`w-10 h-5 rounded-full relative transition-colors ${includeLocation ? 'bg-primary' : 'bg-slate-700'}`}>
-              <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${includeLocation ? 'left-6' : 'left-1'}`} />
-            </div>
+      <div className="flex-grow overflow-y-auto p-8 space-y-8">
+        {/* Localization Logic */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Geospatial Configuration</h3>
+            {locError && <span className="text-[10px] text-red-400 font-medium animate-pulse">{locError}</span>}
           </div>
-
-          <div 
-            onClick={() => setUseMGRS(!useMGRS)}
-            className={`p-4 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${useMGRS ? 'bg-secondary/5 border-secondary/40' : 'bg-slate-800/50 border-white/5 hover:border-white/10'}`}
-          >
-            <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-lg ${useMGRS ? 'bg-secondary/20 text-secondary' : 'bg-slate-700 text-slate-400'}`}>
-                <GlobeAltIcon className="w-5 h-5" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <button 
+              onClick={() => setIncludeLocation(!includeLocation)}
+              className={`p-4 rounded-xl border text-left transition-all ${includeLocation ? 'bg-primary/5 border-primary/40 ring-1 ring-primary/20' : 'bg-slate-800/30 border-white/5 hover:border-white/10'}`}
+            >
+              <div className="flex items-center gap-3 mb-2">
+                <MapPinIcon className={`w-5 h-5 ${includeLocation ? 'text-primary' : 'text-slate-500'}`} />
+                <span className={`text-sm font-bold ${includeLocation ? 'text-white' : 'text-slate-400'}`}>GPS Capture</span>
               </div>
-              <div className="text-left">
-                <span className="block text-sm font-bold text-white">MGRS Grid</span>
-                <span className="text-[10px] text-slate-500 uppercase">Military Coordinates</span>
+              <p className="text-[10px] text-slate-500 leading-tight">Include device coordinates in the report header.</p>
+            </button>
+            <button 
+              onClick={() => setUseMGRS(!useMGRS)}
+              disabled={!includeLocation}
+              className={`p-4 rounded-xl border text-left transition-all ${!includeLocation ? 'opacity-40 cursor-not-allowed' : ''} ${useMGRS && includeLocation ? 'bg-secondary/5 border-secondary/40 ring-1 ring-secondary/20' : 'bg-slate-800/30 border-white/5 hover:border-white/10'}`}
+            >
+              <div className="flex items-center gap-3 mb-2">
+                <GlobeAltIcon className={`w-5 h-5 ${useMGRS && includeLocation ? 'text-secondary' : 'text-slate-500'}`} />
+                <span className={`text-sm font-bold ${useMGRS && includeLocation ? 'text-white' : 'text-slate-400'}`}>MGRS Grid</span>
+              </div>
+              <p className="text-[10px] text-slate-500 leading-tight">Convert Lat/Lon to Military Grid Reference System.</p>
+            </button>
+          </div>
+          {includeLocation && location && (
+            <div className="p-4 bg-slate-900/80 rounded-xl border border-white/5 font-mono text-xs flex justify-between items-center animate-in slide-in-from-top-2">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+                <span className="text-slate-500">Live Fix:</span>
+                <span className="text-white font-bold">{useMGRS ? 'MGRS' : 'WGS84'}</span>
+              </div>
+              <div className="text-primary-400 font-bold tracking-wider">
+                 {useMGRS ? getMGRSDisplay() : `${location.lat.toFixed(5)}, ${location.lon.toFixed(5)}`}
               </div>
             </div>
-            <div className={`w-10 h-5 rounded-full relative transition-colors ${useMGRS ? 'bg-secondary' : 'bg-slate-700'}`}>
-              <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${useMGRS ? 'left-6' : 'left-1'}`} />
-            </div>
-          </div>
-        </div>
+          )}
+        </section>
 
-        {/* Dynamic Coordinate Preview */}
-        {includeLocation && location && (
-          <div className="p-4 bg-slate-900/60 rounded-xl border border-white/5 font-mono text-xs flex justify-between items-center animate-in fade-in slide-in-from-top-2">
-            <div>
-              <span className="text-slate-500 mr-2">System:</span>
-              <span className="text-primary-400 font-bold">{useMGRS ? 'MGRS' : 'WGS84'}</span>
-            </div>
-            <div className="text-slate-300">
-               {useMGRS ? getMGRS() : `${location.lat.toFixed(6)}, ${location.lon.toFixed(6)}`}
-            </div>
-          </div>
-        )}
-
-        {/* Narrative Inputs */}
-        <div className="space-y-4">
+        {/* Narrative Section */}
+        <section className="space-y-6">
           <div className="space-y-2">
             <label className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
               <ShieldCheckIcon className="w-4 h-4" />
-              Neutralization Summary
+              Neutralization & Render-Safe
             </label>
             <textarea 
               value={renderSafe}
               onChange={(e) => setRenderSafe(e.target.value)}
-              placeholder="Detail Render-Safe procedures followed or required..."
-              className="w-full bg-slate-900/50 border border-white/10 rounded-xl p-4 text-sm text-slate-200 focus:border-primary focus:ring-1 focus:ring-primary outline-none min-h-[100px] transition-all"
+              placeholder="Describe actions taken to neutralize the hazard..."
+              className="w-full bg-slate-900/50 border border-white/10 rounded-xl p-4 text-sm text-slate-200 focus:border-primary focus:ring-1 focus:ring-primary outline-none min-h-[120px] transition-all resize-none"
             />
           </div>
-
           <div className="space-y-2">
             <label className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
               <ArrowRightCircleIcon className="w-4 h-4" />
-              Disposal & Follow-up
+              Next Steps / Disposal
             </label>
             <textarea 
               value={furtherActions}
               onChange={(e) => setFurtherActions(e.target.value)}
-              placeholder="e.g., Demolition scheduled, cordoned, or authorities notified..."
-              className="w-full bg-slate-900/50 border border-white/10 rounded-xl p-4 text-sm text-slate-200 focus:border-primary focus:ring-1 focus:ring-primary outline-none min-h-[100px] transition-all"
+              placeholder="Requirements for follow-on disposal teams or cordons..."
+              className="w-full bg-slate-900/50 border border-white/10 rounded-xl p-4 text-sm text-slate-200 focus:border-primary focus:ring-1 focus:ring-primary outline-none min-h-[120px] transition-all resize-none"
             />
           </div>
-        </div>
+        </section>
       </div>
 
       <div className="p-6 border-t border-white/5 bg-slate-900/80 shrink-0">
@@ -251,9 +279,9 @@ export const ReportWizard: React.FC<ReportWizardProps> = ({ data, confidence, so
           onClick={generatePDF}
           disabled={isGenerating}
           className={`
-            w-full py-4 px-6 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-3 transition-all
+            w-full py-4 px-6 rounded-xl font-bold text-lg shadow-xl flex items-center justify-center gap-3 transition-all
             ${isGenerating 
-              ? 'bg-slate-700 text-slate-500 cursor-not-allowed' 
+              ? 'bg-slate-800 text-slate-600 cursor-not-allowed' 
               : 'bg-gradient-to-r from-primary to-secondary text-white hover:shadow-primary/30 active:scale-[0.98]'}
           `}
         >
@@ -262,7 +290,7 @@ export const ReportWizard: React.FC<ReportWizardProps> = ({ data, confidence, so
           ) : (
             <>
               <DocumentArrowDownIcon className="w-6 h-6" />
-              Generate Field Report
+              Finalize Field Report
             </>
           )}
         </button>
