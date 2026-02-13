@@ -33,15 +33,18 @@ const App: React.FC = () => {
   useEffect(() => {
     const attemptAutoLoad = async () => {
       try {
-        // Step 1: Attempt to fetch the directory index of /localModel/
-        // This relies on the server providing a directory listing (common for local dev environments)
+        // Attempt to fetch the directory index. 
+        // Note: On static hosts like GitHub Pages, this will usually 404.
         const dirRes = await fetch('./localModel/');
-        if (!dirRes.ok) throw new Error("Could not access /localModel/ directory listing");
+        
+        if (!dirRes.ok) {
+          console.log("No directory listing available for /localModel/ (expected on static hosts).");
+          return; // Fall back to manual uploader
+        }
 
         const html = await dirRes.text();
         
-        // Step 2: Use regex to extract filenames from the directory listing HTML
-        // Matches typical <a href="filename.onnx"> patterns
+        // Regex to find any .onnx and .json files in the directory listing
         const onnxMatch = html.match(/href=["']?([^"' >]+\.onnx)["']?/i);
         const jsonMatch = html.match(/href=["']?([^"' >]+\.json)["']?/i);
 
@@ -49,10 +52,9 @@ const App: React.FC = () => {
           const onnxFileName = onnxMatch[1];
           const jsonFileName = jsonMatch[1];
           
-          setLoadingMessage(`Initializing local engine: ${onnxFileName}...`);
+          setLoadingMessage(`Initializing local model: ${onnxFileName}...`);
           setIsLoading(true);
           
-          // Step 3: Fetch the specific files identified by the scraper
           const [modelRes, configRes] = await Promise.all([
             fetch(`./localModel/${onnxFileName}`),
             fetch(`./localModel/${jsonFileName}`)
@@ -65,14 +67,13 @@ const App: React.FC = () => {
             await processModelData(modelBuffer, configJson);
             setIsLocalModel(true);
           } else {
-            throw new Error("Found files in directory listing but could not fetch their contents.");
+            console.error("Identified local assets but failed to fetch them.");
           }
-        } else {
-          console.log("No valid .onnx and .json pairs found in /localModel/ listing.");
         }
       } catch (err) {
-        console.log("Auto-detection skipped (folder may be empty or indexing disabled).", err);
+        console.log("Auto-detection skipped (localModel folder not found or listing disabled).");
       } finally {
+        // Always stop the auto-check spinner to allow the app to render the uploader
         setIsAutoChecking(false);
         setIsLoading(false);
       }
@@ -81,13 +82,13 @@ const App: React.FC = () => {
     attemptAutoLoad();
   }, []);
 
-  // Reset result when image changes
+  // Run inference automatically when an image is selected
   useEffect(() => {
-    if (image) {
+    if (image && session) {
       setResult(null);
       handleClassify();
     }
-  }, [image]);
+  }, [image, session]);
 
   const processModelData = async (modelData: File | ArrayBuffer, jsonContent: any) => {
     try {
@@ -133,7 +134,7 @@ const App: React.FC = () => {
       setSession(sess);
     } catch (err) {
       console.error(err);
-      throw new Error("Failed to process model configuration.");
+      throw new Error("Failed to process model configuration. Please check your JSON format.");
     }
   };
 
@@ -166,6 +167,7 @@ const App: React.FC = () => {
     setIsLoading(true);
     setLoadingMessage('Running Inference...');
     
+    // Tiny timeout to let UI update before heavy inference
     setTimeout(async () => {
       try {
         const imgElement = document.createElement('img');
@@ -182,7 +184,7 @@ const App: React.FC = () => {
           }
         };
       } catch (e: any) {
-        setError("Error processing image.");
+        setError("Error processing image for inference.");
         setIsLoading(false);
       }
     }, 100);
@@ -214,9 +216,9 @@ const App: React.FC = () => {
       <main className="container mx-auto px-4 max-w-4xl mt-8">
         
         {error && (
-          <div className="bg-red-500/10 border border-red-500/50 text-red-200 p-4 rounded-xl mb-6 flex items-center justify-between">
+          <div className="bg-red-500/10 border border-red-500/50 text-red-200 p-4 rounded-xl mb-6 flex items-center justify-between animate-in slide-in-from-top-2">
             <span>{error}</span>
-            <button onClick={() => setError(null)} className="text-sm underline hover:text-white">Dismiss</button>
+            <button onClick={() => setError(null)} className="text-sm underline hover:text-white ml-4">Dismiss</button>
           </div>
         )}
 
@@ -234,12 +236,12 @@ const App: React.FC = () => {
             <div className="flex justify-between items-center mb-4">
                <div className="flex flex-col md:flex-row md:items-center gap-3">
                  <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary">
-                   {modelMetadata?.name || 'Classifier Ready'}
+                   {modelMetadata?.name || 'Inference Engine Ready'}
                  </h2>
                  {isLocalModel && (
                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 border border-primary/20 text-primary-400 rounded-full text-[10px] font-bold uppercase tracking-wider">
                      <CheckBadgeIcon className="w-3.5 h-3.5" />
-                     Pre-loaded Asset
+                     Auto-Loaded
                    </div>
                  )}
                  {modelMetadata?.accuracy && (
@@ -254,7 +256,7 @@ const App: React.FC = () => {
                  className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors"
                >
                  <ArrowPathIcon className="w-4 h-4" />
-                 {isLocalModel ? 'Unload Local Assets' : 'Reset Model'}
+                 Reset Engine
                </button>
             </div>
             
