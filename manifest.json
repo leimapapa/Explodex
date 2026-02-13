@@ -1,0 +1,18 @@
+
+{
+  "name": "Explodex",
+  "short_name": "Explodex",
+  "description": "Explodex AI test application.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#3b82f6",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3241/3241219.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
