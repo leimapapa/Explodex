@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { ClassInfo, InferenceResult, ModelManifest, PreprocessConfig } from './types';
 import { loadSession, runInference } from './services/onnxService';
@@ -28,17 +29,18 @@ const App: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Auto-check for local files on mount
+  // Auto-check for local files in the 'localModel' folder on mount
   useEffect(() => {
     const attemptAutoLoad = async () => {
       try {
+        // Updated paths to look inside 'localModel' directory
         const [modelRes, configRes] = await Promise.all([
-          fetch('./model.onnx'),
-          fetch('./config.json')
+          fetch('./localModel/model.onnx'),
+          fetch('./localModel/config.json')
         ]);
 
         if (modelRes.ok && configRes.ok) {
-          setLoadingMessage('Initializing local engine...');
+          setLoadingMessage('Initializing local engine from assets...');
           setIsLoading(true);
           
           const modelBuffer = await modelRes.arrayBuffer();
@@ -46,9 +48,11 @@ const App: React.FC = () => {
           
           await processModelData(modelBuffer, configJson);
           setIsLocalModel(true);
+        } else {
+          console.log("Local model files not found in /localModel/ folder.");
         }
       } catch (err) {
-        console.log("No local model detected, showing uploader.");
+        console.log("No local model detected or error during fetch, showing uploader.");
       } finally {
         setIsAutoChecking(false);
         setIsLoading(false);
@@ -179,7 +183,7 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen bg-dark flex flex-col items-center justify-center p-4">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-primary mb-4"></div>
-        <p className="text-slate-400 font-medium animate-pulse">Checking for pre-loaded assets...</p>
+        <p className="text-slate-400 font-medium animate-pulse">Checking /localModel/ for assets...</p>
       </div>
     );
   }
