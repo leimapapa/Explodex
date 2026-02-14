@@ -1,15 +1,13 @@
+
+// Use named imports to resolve "no exported member" and "Property does not exist" errors in onnxruntime-web
+import { env, InferenceSession, Tensor } from 'onnxruntime-web';
 import { InferenceResult, PreprocessConfig, Candidate } from '../types';
 
-// Access global ort object from CDN
-const getOrt = () => (window as any).ort;
-
-export const loadSession = async (modelData: File | ArrayBuffer): Promise<any> => {
-  const ort = getOrt();
-  if (!ort) throw new Error("ONNX Runtime not loaded");
-
-  // Fix: Explicitly set wasm paths to CDN to avoid relative path loading errors
-  ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/";
-  ort.env.logLevel = 'error';
+// Updated to use InferenceSession directly instead of ort.InferenceSession
+export const loadSession = async (modelData: File | ArrayBuffer): Promise<InferenceSession> => {
+  // Config for ONNX WebAssembly paths - using direct env export
+  env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/";
+  env.logLevel = 'error';
 
   try {
     let buffer: ArrayBuffer;
@@ -19,7 +17,8 @@ export const loadSession = async (modelData: File | ArrayBuffer): Promise<any> =
       buffer = modelData;
     }
 
-    const session = await ort.InferenceSession.create(buffer, {
+    // Using InferenceSession.create directly
+    const session = await InferenceSession.create(buffer, {
       executionProviders: ['wasm'],
       graphOptimizationLevel: 'all',
     });
@@ -30,12 +29,12 @@ export const loadSession = async (modelData: File | ArrayBuffer): Promise<any> =
   }
 };
 
+// Using InferenceSession as a type directly
 export const runInference = async (
-  session: any, 
+  session: InferenceSession, 
   image: HTMLImageElement | HTMLVideoElement,
   config: PreprocessConfig
 ): Promise<InferenceResult> => {
-  const ort = getOrt();
   const startTime = performance.now();
 
   const tensor = preprocessImage(image, config);
@@ -59,11 +58,11 @@ export const runInference = async (
   };
 };
 
+// Using Tensor as a return type directly
 function preprocessImage(
   image: HTMLImageElement | HTMLVideoElement, 
   config: PreprocessConfig
-): any {
-  const ort = getOrt();
+): Tensor {
   const { width, height, mean, std } = config;
   
   const canvas = document.createElement('canvas');
@@ -92,7 +91,8 @@ function preprocessImage(
     }
   }
 
-  return new ort.Tensor('float32', float32Data, [1, 3, height, width]);
+  // Using new Tensor directly instead of ort.Tensor
+  return new Tensor('float32', float32Data, [1, 3, height, width]);
 }
 
 function softmaxAndArgmax(data: Float32Array, k: number = 3): { index: number, probability: number, candidates: Candidate[] } {

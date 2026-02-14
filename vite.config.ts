@@ -3,13 +3,12 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  // Set the base path to your repository name for GitHub Pages
   base: '/Explodex/',
   build: {
     outDir: 'dist',
     rollupOptions: {
-      input: {
-        main: './index.html',
-      }
+      // Dependencies should be bundled, not externalized, for a standard deployment
     },
   },
   server: {

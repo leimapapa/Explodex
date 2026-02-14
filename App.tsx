@@ -29,16 +29,16 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   /**
-   * Ultra-fast Auto-detection:
-   * Pings localModel/manifest.json. If it doesn't respond in 500ms, fallback to manual.
+   * Resilient auto-detection logic.
+   * Uses relative paths that work both in root development and on GitHub Pages sub-directories.
    */
   useEffect(() => {
     const attemptAutoLoad = async () => {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 500); // Tight 500ms probe
+      const timeoutId = setTimeout(() => controller.abort(), 1200);
 
       try {
-        // Try to fetch manifest.json header first to see if it exists
+        // Use './' to explicitly signal a relative path search
         const response = await fetch('./localModel/manifest.json', { 
           method: 'GET',
           signal: controller.signal 
@@ -46,14 +46,12 @@ const App: React.FC = () => {
         
         if (response.ok) {
           const configJson = await response.json();
-          // Manifest exists, start full model load
-          await loadFromPaths('model.onnx', configJson);
+          await loadFromPaths('./localModel/model.onnx', configJson);
         } else {
           setIsAutoChecking(false);
         }
       } catch (err) {
-        // Most likely 404 or Timeout
-        console.log("Auto-detection: Local assets not found. Switching to manual mode.");
+        console.log("Auto-detection: Local assets not found. Switching to manual.");
         setIsAutoChecking(false);
       } finally {
         clearTimeout(timeoutId);
@@ -61,10 +59,10 @@ const App: React.FC = () => {
     };
 
     const loadFromPaths = async (onnxPath: string, configJson: any) => {
-      setLoadingMessage(`Booting Embedded System...`);
+      setLoadingMessage(`Initializing Neural Engine...`);
       setIsLoading(true);
       try {
-        const modelRes = await fetch(`./localModel/${onnxPath}`);
+        const modelRes = await fetch(onnxPath);
         if (modelRes.ok) {
           const modelBuffer = await modelRes.arrayBuffer();
           await processModelData(modelBuffer, configJson);
